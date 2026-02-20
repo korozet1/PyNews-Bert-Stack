@@ -1,0 +1,28 @@
+# --- Python 基础忽略 ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- IDE 配置文件 (PyCharm/VSCode) ---
+.idea/
+.vscode/
+*.swp
+
+# --- 预训练模型 (文件太大，不要上传) ---
+bert-base-chinese/
+
+# --- 训练产出的模型 (生成物，不要上传) ---
+save_models/
+*.pt
+*.bin
+
+# --- 虚拟环境 (如果有本地环境的话) ---
+venv/
+env/
+.env
+
+# --- 系统文件 ---
+.DS_Store
+Thumbs.db
+
+# --- 注意：data 文件夹会被保留，因为没有写在这里 ---
