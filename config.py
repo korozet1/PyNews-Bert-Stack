@@ -34,6 +34,7 @@ class Config(object):
         self.tokenizer = BertTokenizer.from_pretrained(self.bert_path) # BERT模型的分词器 vocab.txt
         self.bert_config = BertConfig.from_pretrained(self.bert_path) # BERT模型的配置config.json
         self.hidden_size = 768 # BERT模型的隐藏层大小
+        self.quantized_model_save_path = r"save_models\quantized_model_bertclassifer_model.pt"
 
 if __name__ == '__main__':
     conf = Config()
