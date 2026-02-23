@@ -171,7 +171,64 @@ streamlit run app.py
     "status": 200
 }
 ```
+## 🚀 运行指南--模型量化 (How to Run)
 
+### 1. 开始训练 (Train)
+```bash
+python train.py
+```
+最佳模型将保存在 `save_models/test_bertclassifer_model.pt`。
+
+### 2. 模型量化 (Quantization)
+运行脚本将 FP32 权重压缩为 INT8 格式，显著提升 CPU 推理速度。
+```bash
+python bert_model_quantization.py
+```
+
+### 3. 量化预测推理 (Predict)
+量化算子目前仅支持 CPU，推理时需强制指定 `device='cpu'`。
+```bash
+python predict_quantization.py
+```
+
+---
+
+## 💡 技术深度总结：模型加载与保存经验 (Engineering Experience)
+
+
+
+在开发模型压缩与量化功能时，本项目总结了以下 PyTorch 核心经验：
+
+### 1. 两种保存方式的权衡
+* **`state_dict` (推荐)**：
+    * 代码：`torch.save(model.state_dict(), path)`。
+    * 特点：仅保存参数字典，文件体积最小。不依赖代码目录结构，跨设备兼容性最强。
+* **全模型保存**：
+    * 代码：`torch.save(model, path)`。
+    * 特点：保存整个模型对象。由于量化后层结构变异，存全量可避免手动执行量化流程，但对文件夹路径有极强依赖。
+
+### 2. 量化模型的“肉体与灵魂”加载逻辑
+* **痛点**：量化模型包含额外的 `scale` 和 `zero_point` 参数。
+* **正确顺序**：如果加载的是量化后的参数字典，必须先实例化原始模型，然后手动执行 `quantize_dynamic` 让结构“变异”，最后通过 `load_state_dict` 注入参数。
+* **报错预防**：若直接将量化参数加载进非量化壳子，会触发 `KeyError` 错误。
+
+### 3. 计算设备约束 (Device Constraint)
+* **CPU 专属**：量化算子目前仅注册在 CPU 端，在 GPU 上运行量化模型会抛出 `NotImplementedError`。
+* **解决方案**：在预测脚本中必须强制指定 `device = 'cpu'`，并将输入 Tensor 同步移至 CPU 内存。
+
+---
+
+## 📡 API 接口文档 (API Documentation)
+* **Endpoint**: `/predict`
+* **Method**: `POST`
+* **Content-Type**: `application/json`
+详情请参考 `api.py` 中的具体实现。
+
+---
+
+## ❓ 常见问题 (FAQ)
+* **Q: 显存溢出 (OOM) 怎么办？**
+* **A**: 在 `config.py` 中调小 `batch_size`（如设为 16 或 32）。
 ---
 
 ## ❓ 常见问题 (FAQ)
