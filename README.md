@@ -15,20 +15,22 @@
 
 ---
 
-## 📖 项目简介 (Introduction)
+## 📖 项目简介
 
 本项目是一个完整的中文新闻文本分类解决方案。不同于传统的机器学习方法（如 SVM、Bayes），本项目基于 Google 强大的 **BERT (Bidirectional Encoder Representations from Transformers)** 预训练模型进行微调（Fine-tuning）。
 
-系统能够精准地理解中文语义，处理长难句，并在**金融、体育、娱乐、科技**等 10 个新闻类别上实现了极高的分类准确率。项目不仅包含核心算法训练，还提供了 **RESTful API 服务** 和 **可视化 Web 界面**，实现了从“算法研发”到“工程落地”的全流程闭环。
+系统能够精准地理解中文语义，处理长难句，并在**金融、体育、娱乐、科技**等 10 个新闻类别上实现了极高的分类准确率。项目不仅包含核心算法训练，还提供了 **RESTful API 服务** 和 **可视化 Web 界面**，实现了从"算法研发"到"工程落地"的全流程闭环。
+
+此外，本项目还引入了**知识蒸馏（Knowledge Distillation）**技术，支持**硬标签蒸馏**和**软标签蒸馏**两种模式，可将复杂的 BERT 教师模型的知识迁移到轻量级的 BiLSTM 学生模型中，在保持较高精度的同时大幅提升推理速度，适合边缘设备部署。
 
 ---
 
-## 📂 项目目录结构 (Directory Structure)
+## 📂 项目目录结构
 
 确保你的项目文件结构如下所示，这对于程序能正确读取文件至关重要：
 
 ```text
-test-04/
+test-06/
 ├── bert-base-chinese/          # [关键] 存放预训练模型文件的目录 (需手动下载)
 │   ├── config.json             # 模型架构配置
 │   ├── pytorch_model.bin       # 模型权重文件 (约400MB+)
@@ -41,12 +43,22 @@ test-04/
 │   ├── dev.txt                 # 验证集
 │   ├── test.txt                # 测试集
 │   └── stopwords.txt           # 停用词表
-├── save_models/                # [自动生成] 训练结果保存目录
-│   └── test_bertclassifer_model.pt  # 训练好的最佳模型
+├── save_models/                # [自动生成] BERT训练结果保存目录
+│   └── test_bertclassifer_model.pt  # 训练好的最佳BERT模型
+├── models_save/                # [自动生成] 学生模型保存目录
+│   ├── bilstm_hard_distill.pth  # 硬标签蒸馏训练的BiLSTM模型
+│   └── bilstm_soft_distill.pth  # 软标签蒸馏训练的BiLSTM模型
 ├── config.py                   # 全局配置文件 (显卡、路径、超参数)
-├── bert_classifer_model.py     # 模型架构代码
-├── train.py                    # 训练主程序
+├── bert_classifer_model.py     # BERT模型架构代码
+├── bilstm_classifier.py        # BiLSTM学生模型架构代码
+├── train.py                    # BERT训练主程序
+├── hard_label_distillation.py  # 硬标签蒸馏训练程序
+├── soft_label_distillation.py  # 软标签蒸馏训练程序
+├── bert_model_quantization.py  # BERT模型量化脚本
+├── predict_fun.py              # 常规模型预测函数
+├── predict_quantization.py     # 量化模型预测函数
 ├── api.py                      # 后端接口服务
+├── api_test.py                 # API测试脚本
 ├── app.py                      # 前端可视化界面
 ├── utils.py                    # 数据处理工具
 └── requirements.txt            # 依赖包列表
@@ -54,11 +66,11 @@ test-04/
 
 ---
 
-## 🛠️ 环境搭建与配置 (Setup Guide)
+## 🛠️ 环境搭建与配置
 
 请严格按照以下步骤操作，确保环境配置无误。
 
-### 第一步：创建虚拟环境 (Conda)
+### 第一步：创建虚拟环境
 
 建议使用 Anaconda 管理环境，防止依赖冲突。打开终端（Terminal/Anaconda Prompt）：
 
@@ -70,7 +82,7 @@ conda create -n bert_env python=3.8
 conda activate bert_env
 ```
 
-### 第二步：安装依赖包 (Pip)
+### 第二步：安装依赖包
 
 在激活的环境中，安装项目所需的第三方库：
 
@@ -82,44 +94,46 @@ pip install torch torchvision torchaudio
 pip install transformers flask streamlit scikit-learn tqdm requests
 ```
 
-### 第三步：下载 BERT 预训练模型 (最关键!)
+### 第三步：下载 BERT 预训练模型
 
 由于模型文件过大（超过 400MB），Git 无法直接上传，你需要手动下载。
 
-1.  **访问 Hugging Face 仓库**:
-    👉 [https://huggingface.co/google-bert/bert-base-chinese/tree/main](https://huggingface.co/google-bert/bert-base-chinese/tree/main)
+1. **访问 Hugging Face 仓库**:
+   👉 [https://huggingface.co/google-bert/bert-base-chinese/tree/main](https://huggingface.co/google-bert/bert-base-chinese/tree/main)
 
-2.  **下载以下 3 个核心文件** (其他 json 文件可选，但这三个必须有):
-    * `config.json`
-    * `pytorch_model.bin` (点击下载按钮，不要右键另存为)
-    * `vocab.txt`
+2. **下载以下 3 个核心文件** (其他 json 文件可选，但这三个必须有):
+   - `config.json`
+   - `pytorch_model.bin` (点击下载按钮，不要右键另存为)
+   - `vocab.txt`
 
-3.  **放置文件**:
-    将下载的文件放入项目根目录下的 `bert-base-chinese/` 文件夹中。
+3. **放置文件**:
+   将下载的文件放入项目根目录下的 `bert-base-chinese/` 文件夹中。
 
-### 第四步：修改配置 (Config)
+### 第四步：修改配置
 
 打开 `config.py` 文件，根据你的硬件情况调整参数：
 
 ```python
 class Config(object):
     # ...
-    
+
     # 显存优化：如果你是 3090/4090 (24G)，可以设为 128 或 64
     # 如果你是 1660Ti/2060 (6G-8G)，建议设为 16 或 32，否则会 OOM (显存溢出)
-    self.batch_size = 128 
-    
+    self.batch_size = 128
+
     # 训练轮数：通常 2-5 轮即可收敛
     self.num_epochs = 2
-    
+
     # ...
 ```
 
 ---
 
-## 🚀 运行指南 (How to Run)
+## 🚀 运行指南
 
-### 1. 开始训练 (Train)
+### 基础运行模式
+
+#### 1. 训练 BERT 教师模型
 
 运行训练脚本，模型将加载预训练权重，并开始在你的数据上进行微调。
 
@@ -129,7 +143,7 @@ python train.py
 
 > **现象**: 控制台会出现进度条，显示 Loss 逐渐下降。训练结束后，最佳模型会自动保存在 `save_models/test_bertclassifer_model.pt`。
 
-### 2. 启动后端 API 服务 (Backend)
+#### 2. 启动后端 API 服务
 
 如果你需要通过接口调用模型，请启动 Flask 服务。
 
@@ -139,9 +153,10 @@ python api.py
 
 > **现象**: 控制台显示 `Running on http://0.0.0.0:8004`。此时服务已挂起，等待请求。
 
-### 3. 启动前端可视化界面 (Frontend)
+#### 3. 启动前端可视化界面
 
 **注意**: 在启动前端之前，**必须先启动 api.py**，因为前端需要调用后端的接口。
+
 保持上面的终端不关闭，打开一个新的终端窗口：
 
 ```bash
@@ -149,23 +164,81 @@ python api.py
 streamlit run app.py
 ```
 
-> **现象**: 浏览器会自动弹出，你可以在网页文本框中输入新闻标题，点击“预测”按钮查看结果。
+> **现象**: 浏览器会自动弹出，你可以在网页文本框中输入新闻标题，点击"预测"按钮查看结果。
 
 ---
 
-## 📡 API 接口文档 (API Documentation)
+### 知识蒸馏模式
+
+知识蒸馏技术可将大模型的知识迁移到小模型，在保持较高精度的同时显著提升推理速度。
+
+#### 1. 硬标签蒸馏（Hard Label Distillation）
+
+硬标签蒸馏让学生模型直接学习教师模型的预测类别。
+
+```bash
+python hard_label_distillation.py
+```
+
+> **说明**: 程序会自动加载训练好的 BERT 模型作为教师，训练 BiLSTM 学生模型，将软标签和硬标签损失结合，蒸馏后的模型保存在 `models_save/bilstm_hard_distill.pth`。
+
+#### 2. 软标签蒸馏（Soft Label Distillation）
+
+软标签蒸馏让学生模型学习教师模型的概率分布，能够传递更丰富的知识。
+
+```bash
+python soft_label_distillation.py
+```
+
+> **说明**: 程序使用 KL 散度损失结合硬标签损失，温度参数 T=2.0，alpha=0.7，蒸馏后的模型保存在 `models_save/bilstm_soft_distill.pth`。
+
+#### 3. 学生模型预测
+
+使用蒸馏后的轻量级 BiLSTM 模型进行预测，推理速度更快：
+
+```bash
+python predict_fun.py
+```
+
+> **优势**: BiLSTM 学生模型相比 BERT 教师模型，推理速度提升 5-10 倍，适合实时应用场景。
+
+---
+
+### 模型量化模式
+
+量化功能可显著提升 CPU 推理速度，适用于边缘部署场景。
+
+#### 1. 模型量化
+
+运行脚本将 FP32 权重压缩为 INT8 格式：
+
+```bash
+python bert_model_quantization.py
+```
+
+#### 2. 量化预测推理
+
+量化算子目前仅支持 CPU，推理时需强制指定 `device='cpu'`：
+
+```bash
+python predict_quantization.py
+```
+
+---
+
+## 📡 API 接口文档
 
 如果你想将此模型集成到其他系统（如 Java/Go 后端），请参考以下接口规范。
 
 **服务地址**: `http://127.0.0.1:8004`
 
-### 📝 文本分类接口
+### 文本分类接口
 
-* **URL Endpoint**: `/predict`
-* **Method**: `POST`
-* **Content-Type**: `application/json`
+- **URL Endpoint**: `/predict`
+- **Method**: `POST`
+- **Content-Type**: `application/json`
 
-**请求体示例 (JSON):**
+**请求体示例:**
 
 ```json
 {
@@ -173,7 +246,7 @@ streamlit run app.py
 }
 ```
 
-**响应体示例 (JSON):**
+**响应体示例:**
 
 ```json
 {
@@ -183,59 +256,42 @@ streamlit run app.py
 }
 ```
 
-## 🚀 运行指南--模型量化 (How to Run)
-
-### 1. 开始训练 (Train)
-
-```bash
-python train.py
-```
-
-最佳模型将保存在 `save_models/test_bertclassifer_model.pt`。
-
-### 2. 模型量化 (Quantization)
-
-运行脚本将 FP32 权重压缩为 INT8 格式，显著提升 CPU 推理速度。
-
-```bash
-python bert_model_quantization.py
-```
-
-### 3. 量化预测推理 (Predict)
-
-量化算子目前仅支持 CPU，推理时需强制指定 `device='cpu'`。
-
-```bash
-python predict_quantization.py
-```
+详情请参考 `api.py` 中的具体实现。
 
 ---
 
-## 💡 技术深度总结：模型加载与保存经验 (Engineering Experience)
+## 💡 技术深度总结
 
-
+### 模型量化经验
 
 在开发模型压缩与量化功能时，本项目总结了以下 PyTorch 核心经验：
 
-### 1. 两种保存方式的权衡
+1. **两种保存方式的权衡**
+   - **`state_dict` (推荐)**: 仅保存参数字典，文件体积最小。不依赖代码目录结构，跨设备兼容性最强。
+   - **全模型保存**: 保存整个模型对象。由于量化后层结构变异，存全量可避免手动执行量化流程，但对文件夹路径有极强依赖。
 
-* **`state_dict` (推荐)**：
-  * 代码：`torch.save(model.state_dict(), path)`。
-  * 特点：仅保存参数字典，文件体积最小。不依赖代码目录结构，跨设备兼容性最强。
-* **全模型保存**：
-  * 代码：`torch.save(model, path)`。
-  * 特点：保存整个模型对象。由于量化后层结构变异，存全量可避免手动执行量化流程，但对文件夹路径有极强依赖。
+2. **量化模型的加载逻辑**
+   - **痛点**: 量化模型包含额外的 `scale` 和 `zero_point` 参数。
+   - **正确顺序**: 如果加载的是量化后的参数字典，必须先实例化原始模型，然后手动执行 `quantize_dynamic` 让结构"变异"，最后通过 `load_state_dict` 注入参数。
+   - **报错预防**: 若直接将量化参数加载进非量化壳子，会触发 `KeyError` 错误。
 
-### 2. 量化模型的“肉体与灵魂”加载逻辑
+3. **计算设备约束**
+   - **CPU 专属**: 量化算子目前仅注册在 CPU 端，在 GPU 上运行量化模型会抛出 `NotImplementedError`。
+   - **解决方案**: 在预测脚本中必须强制指定 `device = 'cpu'`，并将输入 Tensor 同步移至 CPU 内存。
 
-* **痛点**：量化模型包含额外的 `scale` 和 `zero_point` 参数。
-* **正确顺序**：如果加载的是量化后的参数字典，必须先实例化原始模型，然后手动执行 `quantize_dynamic` 让结构“变异”，最后通过 `load_state_dict` 注入参数。
-* **报错预防**：若直接将量化参数加载进非量化壳子，会触发 `KeyError` 错误。
+### 知识蒸馏经验
 
-### 3. 计算设备约束 (Device Constraint)
+1. **蒸馏策略选择**
+   - **硬标签蒸馏**: 简单直接，适合对推理速度要求极高的场景。
+   - **软标签蒸馏**: 通过温度参数平滑概率分布，传递更丰富的知识，通常能获得更好的精度。
 
-* **CPU 专属**：量化算子目前仅注册在 CPU 端，在 GPU 上运行量化模型会抛出 `NotImplementedError`。
-* **解决方案**：在预测脚本中必须强制指定 `device = 'cpu'`，并将输入 Tensor 同步移至 CPU 内存。
+2. **超参数调优**
+   - **温度参数 T**: 一般设置为 2.0-5.0，T 越大，概率分布越平滑。
+   - **权重 alpha**: 软标签损失权重，通常设置为 0.5-0.9，平衡软硬标签损失。
+
+3. **性能对比**
+   - **精度**: BERT 教师模型 > 软标签蒸馏学生模型 > 硬标签蒸馏学生模型
+   - **速度**: BiLSTM 学生模型 >> BERT 教师模型 (5-10倍提升)
 
 ---
 
@@ -252,6 +308,14 @@ A: 说明你的 `bert-base-chinese` 文件夹里缺少文件，或者文件名�
 **Q3: 训练速度很慢？**
 
 A: 请确保你安装的是 GPU 版本的 PyTorch，并且 `config.py` 中的 `device` 被正确识别为 `cuda`。
+
+**Q4: 硬标签蒸馏和软标签蒸馏有什么区别？**
+
+A: 硬标签蒸馏只使用教师模型的预测类别（argmax），简单快速；软标签蒸馏使用教师模型的完整概率分布（通过温度参数软化），能传递更多知识，通常精度更高。
+
+**Q5: 学生模型相比 BERT 有什么优势？**
+
+A: BiLSTM 学生模型参数量远小于 BERT（约 1/10），推理速度提升 5-10 倍，显存占用大幅降低，适合边缘设备和实时应用场景。
 
 ---
 
