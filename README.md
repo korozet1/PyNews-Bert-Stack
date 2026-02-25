@@ -4,7 +4,8 @@
   <p>
     <b>基于 BERT 预训练模型与 PyTorch 框架的企业级中文文本分类系统</b>
   </p>
-  
+
+
   ![PyTorch](https://img.shields.io/badge/Framework-PyTorch-orange?style=flat-square)
   ![BERT](https://img.shields.io/badge/Model-BERT_Base_Chinese-yellow?style=flat-square)
   ![Flask](https://img.shields.io/badge/Microservice-Flask-green?style=flat-square)
@@ -58,6 +59,7 @@ test-04/
 请严格按照以下步骤操作，确保环境配置无误。
 
 ### 第一步：创建虚拟环境 (Conda)
+
 建议使用 Anaconda 管理环境，防止依赖冲突。打开终端（Terminal/Anaconda Prompt）：
 
 ```bash
@@ -69,6 +71,7 @@ conda activate bert_env
 ```
 
 ### 第二步：安装依赖包 (Pip)
+
 在激活的环境中，安装项目所需的第三方库：
 
 ```bash
@@ -80,6 +83,7 @@ pip install transformers flask streamlit scikit-learn tqdm requests
 ```
 
 ### 第三步：下载 BERT 预训练模型 (最关键!)
+
 由于模型文件过大（超过 400MB），Git 无法直接上传，你需要手动下载。
 
 1.  **访问 Hugging Face 仓库**:
@@ -94,6 +98,7 @@ pip install transformers flask streamlit scikit-learn tqdm requests
     将下载的文件放入项目根目录下的 `bert-base-chinese/` 文件夹中。
 
 ### 第四步：修改配置 (Config)
+
 打开 `config.py` 文件，根据你的硬件情况调整参数：
 
 ```python
@@ -115,22 +120,27 @@ class Config(object):
 ## 🚀 运行指南 (How to Run)
 
 ### 1. 开始训练 (Train)
+
 运行训练脚本，模型将加载预训练权重，并开始在你的数据上进行微调。
 
 ```bash
 python train.py
 ```
+
 > **现象**: 控制台会出现进度条，显示 Loss 逐渐下降。训练结束后，最佳模型会自动保存在 `save_models/test_bertclassifer_model.pt`。
 
 ### 2. 启动后端 API 服务 (Backend)
+
 如果你需要通过接口调用模型，请启动 Flask 服务。
 
 ```bash
 python api.py
 ```
+
 > **现象**: 控制台显示 `Running on http://0.0.0.0:8004`。此时服务已挂起，等待请求。
 
 ### 3. 启动前端可视化界面 (Frontend)
+
 **注意**: 在启动前端之前，**必须先启动 api.py**，因为前端需要调用后端的接口。
 保持上面的终端不关闭，打开一个新的终端窗口：
 
@@ -138,6 +148,7 @@ python api.py
 # 记得先激活环境: conda activate bert_env
 streamlit run app.py
 ```
+
 > **现象**: 浏览器会自动弹出，你可以在网页文本框中输入新闻标题，点击“预测”按钮查看结果。
 
 ---
@@ -171,22 +182,29 @@ streamlit run app.py
     "status": 200
 }
 ```
+
 ## 🚀 运行指南--模型量化 (How to Run)
 
 ### 1. 开始训练 (Train)
+
 ```bash
 python train.py
 ```
+
 最佳模型将保存在 `save_models/test_bertclassifer_model.pt`。
 
 ### 2. 模型量化 (Quantization)
+
 运行脚本将 FP32 权重压缩为 INT8 格式，显著提升 CPU 推理速度。
+
 ```bash
 python bert_model_quantization.py
 ```
 
 ### 3. 量化预测推理 (Predict)
+
 量化算子目前仅支持 CPU，推理时需强制指定 `device='cpu'`。
+
 ```bash
 python predict_quantization.py
 ```
@@ -200,50 +218,45 @@ python predict_quantization.py
 在开发模型压缩与量化功能时，本项目总结了以下 PyTorch 核心经验：
 
 ### 1. 两种保存方式的权衡
+
 * **`state_dict` (推荐)**：
-    * 代码：`torch.save(model.state_dict(), path)`。
-    * 特点：仅保存参数字典，文件体积最小。不依赖代码目录结构，跨设备兼容性最强。
+  * 代码：`torch.save(model.state_dict(), path)`。
+  * 特点：仅保存参数字典，文件体积最小。不依赖代码目录结构，跨设备兼容性最强。
 * **全模型保存**：
-    * 代码：`torch.save(model, path)`。
-    * 特点：保存整个模型对象。由于量化后层结构变异，存全量可避免手动执行量化流程，但对文件夹路径有极强依赖。
+  * 代码：`torch.save(model, path)`。
+  * 特点：保存整个模型对象。由于量化后层结构变异，存全量可避免手动执行量化流程，但对文件夹路径有极强依赖。
 
 ### 2. 量化模型的“肉体与灵魂”加载逻辑
+
 * **痛点**：量化模型包含额外的 `scale` 和 `zero_point` 参数。
 * **正确顺序**：如果加载的是量化后的参数字典，必须先实例化原始模型，然后手动执行 `quantize_dynamic` 让结构“变异”，最后通过 `load_state_dict` 注入参数。
 * **报错预防**：若直接将量化参数加载进非量化壳子，会触发 `KeyError` 错误。
 
 ### 3. 计算设备约束 (Device Constraint)
+
 * **CPU 专属**：量化算子目前仅注册在 CPU 端，在 GPU 上运行量化模型会抛出 `NotImplementedError`。
 * **解决方案**：在预测脚本中必须强制指定 `device = 'cpu'`，并将输入 Tensor 同步移至 CPU 内存。
 
 ---
 
-## 📡 API 接口文档 (API Documentation)
-* **Endpoint**: `/predict`
-* **Method**: `POST`
-* **Content-Type**: `application/json`
-详情请参考 `api.py` 中的具体实现。
+## ❓ 常见问题
 
----
+**Q1: 显存溢出 (OOM) 怎么办？**
 
-## ❓ 常见问题 (FAQ)
-* **Q: 显存溢出 (OOM) 怎么办？**
-* **A**: 在 `config.py` 中调小 `batch_size`（如设为 16 或 32）。
----
-
-## ❓ 常见问题 (FAQ)
-
-**Q1: 报错 `CUDA out of memory` 怎么办？**
 A: 说明显存爆了。请打开 `config.py`，将 `self.batch_size` 从 128 改为 64，甚至 32 或 16。
 
 **Q2: 报错 `OSError: Can't load weights for 'bert-base-chinese'` 怎么办？**
+
 A: 说明你的 `bert-base-chinese` 文件夹里缺少文件，或者文件名不对。请检查是否包含了 `pytorch_model.bin` 等文件，且路径正确。
 
 **Q3: 训练速度很慢？**
+
 A: 请确保你安装的是 GPU 版本的 PyTorch，并且 `config.py` 中的 `device` 被正确识别为 `cuda`。
 
 ---
 
 ## 📄 版权说明
+
 本项目采用 MIT 开源协议。
+
 > 2026 © Developed by BERT-Team
